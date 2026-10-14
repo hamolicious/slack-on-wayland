@@ -36,12 +36,10 @@ Use the separate profile, or the copy just hands off to your running Slack. Sign
 
 ## Patches
 
-| Patch | Problem | Fix |
-| --- | --- | --- |
-| `0001-linux-enable-drawing` | The web client from app.slack.com disables drawing on every Linux build: `isDrawSupported(){return!isLinux()&&isDesktopApp()}`. | The preload hooks the web client's rspack chunk loader and forces this check to return true. |
-| `0002-wayland-screen-sources` | On Wayland, every capture-source request is a separate portal prompt with new IDs and no `display_id`. Slack re-requests sources when the share starts, misses the one you picked, and treats the share as a window share, so the drawing overlay gets no bounds and no drawing surface. | On Wayland, Slack gets one stable placeholder source ("Entire screen"), and you choose the real screen or window in the capture's own prompt. Screen sources get a placeholder `display_id`. |
-| `0003-draw-window-hook` | Wayland ignores the overlay's position and always-on-top, and Slack opens it non-resizable, which locks its size. | The overlay is titled `Slack huddle drawing`, made resizable, and a user hook runs on every change to it. When a hook is installed, Slack stops applying the overlay's bounds itself. |
-| `0004-draw-window-redraw-on-resize` | Slack sizes the overlay's drawing surface only when it renders and ignores later resizes. When the compositor resizes the overlay, the surface stays small until you click it. | The overlay is re-rendered whenever its window is resized. |
+- **`0001-linux-enable-drawing`**: Slack's web client turns drawing off on every Linux build (`isDrawSupported()` returns false on Linux), so nobody can draw on a Linux user's shared screen. The patch hooks the web client's code loader and makes that check return true, so the "allow drawing" toggle appears and other people can draw on your screen.
+- **`0002-wayland-screen-sources`**: On Wayland, every request for screen sources opens a new portal prompt with new IDs, so Slack loses track of the screen you picked and treats the share as a window share with no drawing surface. The patch gives Slack one stable "Entire screen" source and leaves the real choice to the capture's own system prompt, so the share is recognised as a screen share and the drawing overlay gets a surface.
+- **`0003-draw-window-hook`**: Wayland ignores the drawing overlay's position and always-on-top, and Slack creates it non-resizable, so it opens as a small 800×600 window that the compositor tiles or blurs. The patch gives the overlay a fixed title, makes it resizable, and runs a user hook on each change to it, so your compositor can float it and place it over the shared screen.
+- **`0004-draw-window-redraw-on-resize`**: Slack sizes the drawing surface only when it first renders the overlay, so when the compositor resizes the overlay afterwards, the surface stays small until you click it. The patch adds a refresh signal that re-renders the overlay whenever its window is resized, so the surface fills the screen straight away.
 
 You need `0001` for drawing at all. `0002`, `0003` and `0004` are for Wayland; `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook.
 
