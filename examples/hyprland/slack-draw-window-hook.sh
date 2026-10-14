@@ -5,7 +5,7 @@
 set -euo pipefail
 log() { echo "$(date +%T) $*" >>/tmp/slack-draw-hook.log; }
 log "$* slack: x=${SLACK_DRAW_X:-} y=${SLACK_DRAW_Y:-} w=${SLACK_DRAW_WIDTH:-} h=${SLACK_DRAW_HEIGHT:-}"
-case ${1:-} in bounds | show) ;; *) exit 0 ;; esac
+case ${1:-} in bounds | show | picked) ;; *) exit 0 ;; esac  # picked: sent by share-picker.sh
 
 x=${SLACK_DRAW_X:-} y=${SLACK_DRAW_Y:-} w=${SLACK_DRAW_WIDTH:-} h=${SLACK_DRAW_HEIGHT:-}
 picked=${XDG_RUNTIME_DIR:-/tmp}/share-picker-output
