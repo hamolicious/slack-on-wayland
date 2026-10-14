@@ -59,8 +59,8 @@ The hook should float, pin and unblur the overlay, and move and resize it over t
 
 `examples/hyprland/` is a working setup for Hyprland 0.56 (Lua config) with xdg-desktop-portal-hyprland:
 
-- `share-picker.sh` wraps `hyprland-share-picker` and records the output you pick. Set it as `custom_picker_binary` in `xdph.conf`, then restart the portal: `systemctl --user restart xdg-desktop-portal-hyprland`.
+- `share-picker.sh` wraps `hyprland-share-picker`. It records the output you pick. It also answers repeat requests from the same share: Chromium opens three portal sessions for one screen share, so without it you'd pick three times. Set it as `custom_picker_binary` in `xdph.conf`, then restart the portal: `systemctl --user restart xdg-desktop-portal-hyprland`.
 - `slack-draw-window-hook.sh` puts the overlay on the recorded output, and falls back to Slack's bounds otherwise. Link it in: `ln -s …/slack-draw-window-hook.sh ~/.config/slack-patch/draw-window-hook`.
-- `window-rule.lua` floats, pins and unblurs the overlay. Don't add `no_focus`: it makes the overlay ignore clicks.
+- `window-rule.lua` floats, pins and unblurs the overlay. Don't add `no_focus`, which makes the overlay ignore clicks, or `no_anim`, which leaves it drawn at its old size until you draw on it.
 
-Don't enable `allow_token_by_default` in xdph. With restore tokens, the portal silently reuses your last screen, so you can't switch monitors.
+Don't enable `allow_token_by_default` in xdph. It doesn't stop the repeat prompts, because Chromium drops the first two sessions before they start, so they never get a token. And it can make the portal reuse your last screen without asking.
