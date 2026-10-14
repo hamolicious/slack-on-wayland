@@ -37,8 +37,9 @@ Use the separate profile, or the copy just hands off to your running Slack. Sign
 | `0001-linux-enable-drawing` | The web client from app.slack.com disables drawing on every Linux build: `isDrawSupported(){return!isLinux()&&isDesktopApp()}`. | The preload hooks the web client's rspack chunk loader and forces this check to return true. |
 | `0002-wayland-screen-sources` | On Wayland, every capture-source request is a separate portal prompt with new IDs and no `display_id`. Slack re-requests sources when the share starts, misses the one you picked, and treats the share as a window share, so the drawing overlay gets no bounds and no drawing surface. | On Wayland, Slack gets one stable placeholder source ("Entire screen"), and you choose the real screen or window in the capture's own prompt. Screen sources get a placeholder `display_id`. |
 | `0003-draw-window-hook` | Wayland ignores the overlay's position and always-on-top, and Slack opens it non-resizable, which locks its size. | The overlay is titled `Slack huddle drawing`, made resizable, and a user hook runs on every change to it. When a hook is installed, Slack stops applying the overlay's bounds itself. |
+| `0004-draw-window-redraw-on-resize` | Slack sizes the overlay's drawing surface only when it renders and ignores later resizes. When the compositor resizes the overlay, the surface stays small until you click it. | The overlay is re-rendered whenever its window is resized. |
 
-You need `0001` for drawing at all. `0002` and `0003` are for Wayland.
+You need `0001` for drawing at all. `0002`, `0003` and `0004` are for Wayland; `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook.
 
 ## Draw window hook
 
