@@ -14,12 +14,16 @@ Requirements: Slack 41.2.2 installed at `/usr/lib/slack` (Arch `slack-desktop`),
 6. **Share in a huddle:** pick "Entire screen" in Slack, then choose the screen in the system picker. Turn drawing on from the huddle controls.
 
 ```sh
-sudo ./apply.sh              # patch /usr/lib/slack; keeps app.asar.orig; safe to re-run
-./apply.sh ~/slack-copy      # patch another install (no sudo for your own dirs)
-sudo ./apply.sh --restore    # put the original app.asar back
+sudo ./apply.sh                    # apply every patch to /usr/lib/slack; keeps app.asar.orig; safe to re-run
+sudo ./apply.sh --only 0001,0003   # apply only some patches (by number or name)
+./apply.sh --list                  # list the patches
+./apply.sh ~/slack-copy            # patch another install (no sudo for your own dirs)
+sudo ./apply.sh --restore          # put the original app.asar back
 ```
 
-`apply.sh` refuses to run on any other version or hash. It always patches from `app.asar.orig`, applies every `patches/*.mjs` in order, checks that the result parses and that the unpacked file set is unchanged, then swaps `app.asar`. After reinstalling Slack, run it again.
+Every patch is optional and can be applied on its own or with any of the others. `apply.sh` applies them in numeric order. Re-running with a different `--only` replaces the previous selection, because it always starts from the original.
+
+`apply.sh` refuses to run on any other version or hash. It always patches from `app.asar.orig`, applies the selected `patches/*.mjs` in order, checks that the result parses and that the unpacked file set is unchanged, then swaps `app.asar`. After reinstalling Slack, run it again.
 
 ### Try it on a copy first
 

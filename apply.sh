@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Apply patches/*.mjs to a pinned Slack install's app.asar.
+# Apply patches/*.mjs (all, or --only a selection) to a pinned Slack install's app.asar.
 # Always patches from app.asar.orig, so re-running is idempotent; --restore puts the original back.
 set -euo pipefail
 
@@ -13,17 +13,48 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<EOF
-usage: $0 [--restore] [SLACK_DIR]
-  SLACK_DIR  Slack install dir (default /usr/lib/slack). Needs write access (sudo for /usr/lib).
-  --restore  put the original app.asar back
+usage: $0 [--only LIST] [--restore] [--list] [SLACK_DIR]
+  SLACK_DIR    Slack install dir (default /usr/lib/slack). Needs write access (sudo for /usr/lib).
+  --only LIST  apply only these patches, comma-separated by number or name (e.g. 0001,0003).
+               Default: every patch in patches/.
+  --list       list the patches and exit
+  --restore    put the original app.asar back
 EOF
 }
 
-restore=0
-case "${1:-}" in
-  -h|--help) usage; exit 0 ;;
-  --restore) restore=1; shift ;;
-esac
+list() {
+  for f in "$HERE"/patches/*.mjs; do
+    printf '%-40s %s\n' "$(basename "$f" .mjs)" "$(sed -n '1s#^// ##p' "$f")"
+  done
+}
+
+restore=0 only=""
+while (( $# )); do
+  case $1 in
+    -h|--help) usage; exit 0 ;;
+    --list) list; exit 0 ;;
+    --restore) restore=1 ;;
+    --only) [[ -n ${2:-} ]] || die "--only needs a list, e.g. --only 0001,0003"; only=$2; shift ;;
+    -*) usage >&2; die "unknown option $1" ;;
+    *) break ;;
+  esac
+  shift
+done
+
+patches=("$HERE"/patches/*.mjs)
+if [[ -n $only ]]; then
+  patches=()
+  IFS=, read -ra wanted <<<"$only"
+  for w in "${wanted[@]}"; do
+    matches=("$HERE"/patches/"$w"*.mjs)
+    [[ -f ${matches[0]} ]] || die "no patch matches '$w' (see --list)"
+    (( ${#matches[@]} == 1 )) || die "'$w' matches more than one patch (see --list)"
+    patches+=("${matches[0]}")
+  done
+  # Apply in numeric order whatever order LIST is in.
+  mapfile -t patches < <(printf '%s\n' "${patches[@]}" | sort -u)
+fi
+
 dir=${1:-/usr/lib/slack}
 res=$dir/resources
 [[ -f $res/app.asar ]] || die "no app.asar in $res"
@@ -57,7 +88,7 @@ ln -s "$res/app.asar.unpacked" "$work/src/app.asar.unpacked"
 "${ASAR[@]}" list --is-pack "$work/src/app.asar" | sed -n 's/^unpack : //p' | sort > "$work/unpack.orig"
 
 log "applying patches"
-node "$HERE/lib/edit.mjs" "$work/app" "$HERE"/patches/*.mjs
+node "$HERE/lib/edit.mjs" "$work/app" "${patches[@]}"
 for f in "$work"/app/dist/{main.bundle.cjs,preload.bundle.js}; do node --check "$f" || die "patched $f does not parse"; done
 
 log "repacking"
