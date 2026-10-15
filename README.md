@@ -10,7 +10,7 @@ Requirements: Slack 41.2.2 installed at `/usr/lib/slack` (Arch `slack-desktop`),
 2. **Check the patches:** `node --test test/*.test.mjs`.
 3. **Optionally try it on a copy first** (see below).
 4. **Patch Slack:** `sudo ./apply.sh`, then quit Slack completely (including the tray) and start it again.
-5. **On Wayland, set up the overlay hook** for your compositor (see [Draw window hook](#draw-window-hook)). Without it, drawing works, but the overlay isn't placed over the shared screen. For Hyprland, copy the files in `examples/hyprland/`; see [Hyprland](#hyprland).
+5. **On Wayland, set up the hooks** for your compositor (see [Draw window hook](#draw-window-hook) and [Share rotation hook](#share-rotation-hook-0006)). Without them, drawing works, but the overlay isn't placed over the shared screen and portrait screens are shared sideways. For Hyprland, copy the files in `examples/hyprland/`; see [Hyprland](#hyprland-example).
 6. **Share in a huddle:** pick "Entire screen" in Slack, then choose the screen in the system picker. Turn drawing on from the huddle controls.
 
 ```sh
@@ -61,12 +61,17 @@ Environment: `SLACK_DRAW_TITLE`, `SLACK_DRAW_PID` (Slack's main process), and `S
 
 The hook should float, pin and unblur the overlay, and move and resize it over the shared monitor. Slack handles click-through itself: clicks pass through until you turn drawing on.
 
-### Hyprland
+## Share rotation hook (`0006`)
+
+When a screen share starts, Slack runs `$SLACK_SHARE_ROTATION_HOOK`, or `~/.config/slack-patch/share-rotation` if that variable isn't set, with a 2-second timeout. It should print `0`, `90`, `180` or `270`: the clockwise rotation of the screen that was just picked. Anything else, an error or a missing hook means `0`, and the share is left as it is.
+
+## Hyprland example
 
 `examples/hyprland/` is a working setup for Hyprland 0.56 (Lua config) with xdg-desktop-portal-hyprland:
 
 - `share-picker.sh` wraps `hyprland-share-picker`. It records the output you pick, and moves an open drawing overlay to that screen by running the draw hook with the event `picked`. It also answers repeat requests from the same share: Chromium opens three portal sessions for one screen share, so without it you'd pick three times. Set it as `custom_picker_binary` in `xdph.conf`, then restart the portal: `systemctl --user restart xdg-desktop-portal-hyprland`.
 - `slack-draw-window-hook.sh` puts the overlay on the recorded output, and falls back to Slack's bounds otherwise. Link it in: `ln -s …/slack-draw-window-hook.sh ~/.config/slack-patch/draw-window-hook`.
-- `window-rule.lua` floats, pins and unblurs the overlay. Don't add `no_focus`: it makes the overlay ignore clicks.
+- `share-rotation.sh` is the `0006` hook: it prints the rotation of the output recorded by `share-picker.sh`. Link it in: `ln -s …/share-rotation.sh ~/.config/slack-patch/share-rotation`.
+- `window-rule.lua` floats, pins and unblurs the overlay. Don't add `no_focus`: it makes the overlay ignore clicks. It also floats and pins the huddle panel (`0005`), and raises it again 50 ms after the overlay takes focus, because Hyprland raises the overlay over it when you click to draw.
 
 Don't enable `allow_token_by_default` in xdph. It doesn't stop the repeat prompts, because Chromium drops the first two sessions before they start, so they never get a token. And it can make the portal reuse your last screen without asking.
