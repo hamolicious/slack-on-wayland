@@ -41,8 +41,9 @@ Use the separate profile, or the copy just hands off to your running Slack. Sign
 - **`0003-draw-window-hook`**: Wayland ignores the drawing overlay's position and always-on-top, and Slack creates it non-resizable, so it opens as a small 800×600 window that the compositor tiles or blurs. The patch gives the overlay a fixed title, makes it resizable, and runs a user hook on each change to it, so your compositor can float it and place it over the shared screen.
 - **`0004-draw-window-redraw-on-resize`**: Slack sizes the drawing surface only when it first renders the overlay, so when the compositor resizes the overlay afterwards, the surface stays small until you click it. The patch adds a refresh signal that re-renders the overlay whenever its window is resized, so the surface fills the screen straight away.
 - **`0005-huddle-panel-title`**: The huddle panel holds the only button that turns drawing off (Slack's "hold Ctrl to click through" escape has no listener in the shipped app), and on Wayland the drawing overlay covers it as soon as you click to draw. The patch gives the panel a fixed title, `Slack huddle`, so a compositor rule can keep it above the overlay and you can always stop drawing.
+- **`0006-rotate-shared-screen`**: On Wayland, a rotated (portrait) monitor's frames arrive unrotated, with the rotation in metadata that Chromium ignores, so a portrait screen is shared sideways. The patch asks a user hook how far the picked screen is rotated and tags every frame with that rotation, so viewers see it upright and no pixels have to be copied.
 
-You need `0001` for drawing at all. `0002`, `0003` and `0004` are for Wayland; `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook.
+You need `0001` for drawing at all. `0002` to `0006` are for Wayland: `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook, and `0005` and `0006` need compositor rules or hooks to have any effect.
 
 ## Draw window hook
 
