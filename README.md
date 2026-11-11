@@ -4,13 +4,13 @@ Patches for the Slack desktop app's `app.asar`, pinned to **Slack 41.2.2** (`app
 
 ## Usage
 
-Requirements: Slack 41.2.2 installed at `/usr/lib/slack` (Arch `slack-desktop`), plus `node` and `npm`. `apply.sh` fetches `@electron/asar` itself.
+Requirements: Slack 41.2.2 installed at `/usr/lib/slack` (Arch `slack-desktop`, or the AUR's `slack-desktop-wayland`), plus `node` and `npm` on root's `PATH` (`sudo` resets `PATH`, so a `node` from nvm, mise or asdf isn't found; install them system-wide or run `sudo env PATH="$PATH" ./apply.sh`). `apply.sh` fetches `@electron/asar` itself.
 
-1. **Pin Slack** so an update doesn't replace the patched file. In `/etc/pacman.conf`, set `IgnorePkg = slack-desktop`.
+1. **Pin Slack** so an update doesn't replace the patched file. In `/etc/pacman.conf`, set `IgnorePkg = slack-desktop` (or `slack-desktop-wayland`, whichever you installed; `pacman -Qo /usr/lib/slack/slack` tells you).
 2. **Check the patches:** `node --test test/*.test.mjs`.
 3. **Optionally try it on a copy first** (see below).
 4. **Patch Slack:** `sudo ./apply.sh`, then quit Slack completely (including the tray) and start it again.
-5. **On Wayland, set up the hooks** for your compositor (see [Draw window hook](#draw-window-hook) and [Share rotation hook](#share-rotation-hook-0006)). Without them, drawing works, but the overlay isn't placed over the shared screen and portrait screens are shared sideways. For Hyprland, copy the files in `examples/hyprland/`; see [Hyprland](#hyprland-example).
+5. **On Wayland, set up the hooks** for your compositor (see [Draw window hook](#draw-window-hook) and [Share rotation hook](#share-rotation-hook-0006)). Without them, drawing works, but the overlay isn't placed over the shared screen and portrait screens are shared sideways. For Hyprland, copy the files in `examples/hyprland/`; see [Hyprland](#hyprland-example). For KDE Plasma 6, see [KDE Plasma](#kde-plasma-example).
 6. **Share in a huddle:** pick "Entire screen" in Slack, then choose the screen in the system picker. Turn drawing on from the huddle controls.
 
 ```sh
@@ -75,3 +75,14 @@ When a screen share starts, Slack runs `$SLACK_SHARE_ROTATION_HOOK`, or `~/.conf
 - `window-rule.lua` floats, pins and unblurs the overlay. Don't add `no_focus`: it makes the overlay ignore clicks. It also floats and pins the huddle panel (`0005`), and raises it again 50 ms after the overlay takes focus, because Hyprland raises the overlay over it when you click to draw.
 
 Don't enable `allow_token_by_default` in xdph. It doesn't stop the repeat prompts, because Chromium drops the first two sessions before they start, so they never get a token. And it can make the portal reuse your last screen without asking.
+
+## KDE Plasma example
+
+`examples/kde/` is a setup for KDE Plasma 6 (KWin on Wayland) with xdg-desktop-portal-kde. It needs `qdbus6`, `jq` and `pw-dump` (PipeWire).
+
+- `slack-draw-window-hook.sh` is the draw window hook. Link it in: `ln -s …/examples/kde/slack-draw-window-hook.sh ~/.config/slack-patch/draw-window-hook`. Keep `kwin-slack-huddle.js` next to it: the hook loads that file into KWin (as the script `slack-huddle`) with the overlay's target, and unloads it when the overlay closes.
+- `kwin-slack-huddle.js` removes the overlay's border, keeps it above other windows and off the taskbar and switcher, and places it over the shared screen. It also keeps the huddle panel (`0005`) above, and raises it again whenever the overlay takes focus, so the button that turns drawing off stays clickable.
+
+The hook needs no picker wrapper: KWin names each screen-cast PipeWire stream `kwin-screencast-<output>`, so the newest such stream tells the hook which screen you picked. Slack shows the overlay before you pick, so the overlay starts on Slack's bounds (the primary display), and the hook moves it once the stream appears (it waits up to 60 seconds). If another app is casting a screen at the same time (OBS, KRDP), its stream can win instead. The hook logs to `$XDG_RUNTIME_DIR/slack-draw-hook/log`.
+
+There's no KDE share rotation hook (`0006`) yet: it would need checking on a rotated monitor whether KWin's screen cast already sends it upright.
