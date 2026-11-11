@@ -21,3 +21,15 @@ test('isDrawSupported is forced true; isLinux and look-alikes are untouched', ()
   assert.equal(req('9ZZn').j9(), true, 'isLinux itself is not touched')
   assert.equal(req('other').A(), 'untouched', 'modules without the source marker are not wrapped')
 })
+
+test('newer runtimes: isDrawSupported exported as a value is forced true, other values pass through', async () => {
+  const { bootReleaseRuntime } = await import('./runtime.mjs')
+  resetGlobals()
+  hook(addModulePatch)
+  const { req } = bootReleaseRuntime('rspackChunkGantryV2')
+  globalThis.rspackChunkGantryV2.push([['c'], {
+    RV46(e, t, a) {"use strict";function isDrawSupported(){return!(0,isLinux)()}function isLinux(){return true}function keep(){return 'kept'}a.d(t,{},{A:isDrawSupported,K:keep})},
+  }])
+  assert.equal(req('RV46').A(), true)
+  assert.equal(req('RV46').K(), 'kept', 'the values argument still reaches require.d')
+})

@@ -43,7 +43,11 @@ Use the separate profile, or the copy just hands off to your running Slack. Sign
 - **`0005-huddle-panel-title`**: The huddle panel holds the only button that turns drawing off (Slack's "hold Ctrl to click through" escape has no listener in the shipped app), and on Wayland the drawing overlay covers it as soon as you click to draw. The patch gives the panel a fixed title, `Slack huddle`, so a compositor rule can keep it above the overlay and you can always stop drawing.
 - **`0006-rotate-shared-screen`**: On Wayland, a rotated (portrait) monitor's frames arrive unrotated, with the rotation in metadata that Chromium ignores, so a portrait screen is shared sideways. The patch asks a user hook how far the picked screen is rotated and tags every frame with that rotation, so viewers see it upright and no pixels have to be copied.
 
-You need `0001` for drawing at all. `0002` to `0006` are for Wayland: `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook, and `0005` and `0006` need compositor rules or hooks to have any effect.
+You need `0001` for drawing with web clients that still have the Linux check. The web client served since November 2026 no longer has it (screen-share drawing is gated only on running in the desktop app), so there `0001` matches nothing and changes nothing. `0002` to `0006` are for Wayland: `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook, and `0005` and `0006` need compositor rules or hooks to have any effect.
+
+### Slack's chunk runtime
+
+`0001`, `0004` and `0006` patch the web client, which Slack serves from app.slack.com and updates without a desktop release. They hook its rspack chunk queues (`lib/main-world.mjs`). Since November 2026 the logged-in client's runtime refuses to start ("the Gantry chunk queue already has a runtime") if the queue's `push` is an accessor, and discards queued chunks if `push` isn't the native one; Slack then shows "For some reason, Slack couldn't load". The hook therefore wraps the queue in a Proxy that leaves `push` native until the runtime installs its own. If Slack stops loading after a web client update, check `~/.config/Slack/logs/default/webapp-console.log` for `ReleaseModuleFactoriesPlugin` or `slack-patch` errors, and `sudo ./apply.sh --only 0002,0003,0005` keeps the patches that don't touch the web client.
 
 ## Draw window hook
 
