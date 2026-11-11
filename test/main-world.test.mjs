@@ -23,3 +23,33 @@ for (const name of ['rspackChunkwebapp', 'rspackChunkGantryV2'])
     assert.equal(req('other').patchedBy, undefined)
     assert.equal(chunks.length, 2)
   })
+
+test('rspackChunkGantryV2 with ReleaseModuleFactoriesPlugin: the runtime boots cleanly and patches still apply', async () => {
+  const { bootReleaseRuntime } = await import('./runtime.mjs')
+  resetGlobals()
+  addModulePatch('orig early', wrapTo('early'))
+  addModulePatch('orig late', wrapTo('late'))
+  const q = globalThis.rspackChunkGantryV2
+  assert.ok(Array.isArray(q))
+  assert.equal(q.push, Array.prototype.push, 'the queue still has the native push before the runtime boots')
+  assert.equal(Object.getOwnPropertyDescriptor(q, 'push'), undefined, 'and no push of its own')
+  q.push([['a'], { early: mods.early }])
+  const { req, warnings } = bootReleaseRuntime('rspackChunkGantryV2')
+  assert.deepEqual(warnings, [], 'no "another runtime is attached" warning')
+  // Chunk files push through the global, as the webapp's chunks do.
+  ;(globalThis.rspackChunkGantryV2 ||= []).push([['b'], { late: mods.late, other: mods.other }])
+  assert.equal(req('early').patchedBy, 'early')
+  assert.equal(req('late').patchedBy, 'late')
+  assert.equal(req('other').patchedBy, undefined)
+  assert.equal(globalThis.rspackChunkGantryV2.length, 0, "the runtime's queue release still works")
+})
+
+test('a module is wrapped once even though its chunk passes through several pushes', async () => {
+  const { bootReleaseRuntime } = await import('./runtime.mjs')
+  resetGlobals()
+  let wraps = 0
+  addModulePatch('orig late', (f) => (wraps++, f))
+  bootReleaseRuntime('rspackChunkGantryV2')
+  globalThis.rspackChunkGantryV2.push([['b'], { late: mods.late }])
+  assert.equal(wraps, 1)
+})

@@ -4,13 +4,13 @@ Patches for the Slack desktop app's `app.asar`, pinned to **Slack 41.2.2** (`app
 
 ## Usage
 
-Requirements: Slack 41.2.2 installed at `/usr/lib/slack` (Arch `slack-desktop`), plus `node` and `npm`. `apply.sh` fetches `@electron/asar` itself.
+Requirements: Slack 41.2.2 installed at `/usr/lib/slack` (Arch `slack-desktop`, or the AUR's `slack-desktop-wayland`), plus `node` and `npm` on root's `PATH` (`sudo` resets `PATH`, so a `node` from nvm, mise or asdf isn't found; install them system-wide or run `sudo env PATH="$PATH" ./apply.sh`). `apply.sh` fetches `@electron/asar` itself.
 
-1. **Pin Slack** so an update doesn't replace the patched file. In `/etc/pacman.conf`, set `IgnorePkg = slack-desktop`.
+1. **Pin Slack** so an update doesn't replace the patched file. In `/etc/pacman.conf`, set `IgnorePkg = slack-desktop` (or `slack-desktop-wayland`, whichever you installed; `pacman -Qo /usr/lib/slack/slack` tells you).
 2. **Check the patches:** `node --test test/*.test.mjs`.
 3. **Optionally try it on a copy first** (see below).
 4. **Patch Slack:** `sudo ./apply.sh`, then quit Slack completely (including the tray) and start it again.
-5. **On Wayland, set up the hooks** for your compositor (see [Draw window hook](#draw-window-hook) and [Share rotation hook](#share-rotation-hook-0006)). Without them, drawing works, but the overlay isn't placed over the shared screen and portrait screens are shared sideways. For Hyprland, copy the files in `examples/hyprland/`; see [Hyprland](#hyprland-example).
+5. **On Wayland, set up the hooks** for your compositor (see [Draw window hook](#draw-window-hook) and [Share rotation hook](#share-rotation-hook-0006)). Without them, drawing works, but the overlay isn't placed over the shared screen and portrait screens are shared sideways. For Hyprland, copy the files in `examples/hyprland/`; see [Hyprland](#hyprland-example). For KDE Plasma 6, see [KDE Plasma](#kde-plasma-example).
 6. **Share in a huddle:** pick "Entire screen" in Slack, then choose the screen in the system picker. Turn drawing on from the huddle controls.
 
 ```sh
@@ -43,7 +43,11 @@ Use the separate profile, or the copy just hands off to your running Slack. Sign
 - **`0005-huddle-panel-title`**: The huddle panel holds the only button that turns drawing off (Slack's "hold Ctrl to click through" escape has no listener in the shipped app), and on Wayland the drawing overlay covers it as soon as you click to draw. The patch gives the panel a fixed title, `Slack huddle`, so a compositor rule can keep it above the overlay and you can always stop drawing.
 - **`0006-rotate-shared-screen`**: On Wayland, a rotated (portrait) monitor's frames arrive unrotated, with the rotation in metadata that Chromium ignores, so a portrait screen is shared sideways. The patch asks a user hook how far the picked screen is rotated and tags every frame with that rotation, so viewers see it upright and no pixels have to be copied.
 
-You need `0001` for drawing at all. `0002` to `0006` are for Wayland: `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook, and `0005` and `0006` need compositor rules or hooks to have any effect.
+You need `0001` for drawing with web clients that still have the Linux check. The web client served since November 2026 no longer has it (screen-share drawing is gated only on running in the desktop app), so there `0001` matches nothing and changes nothing. `0002` to `0006` are for Wayland: `0004` matters when something other than Slack sizes the overlay, such as `0003`'s hook, and `0005` and `0006` need compositor rules or hooks to have any effect.
+
+### Slack's chunk runtime
+
+`0001`, `0004` and `0006` patch the web client, which Slack serves from app.slack.com and updates without a desktop release. They hook its rspack chunk queues (`lib/main-world.mjs`). Since November 2026 the logged-in client's runtime refuses to start ("the Gantry chunk queue already has a runtime") if the queue's `push` is an accessor, and discards queued chunks if `push` isn't the native one; Slack then shows "For some reason, Slack couldn't load". The hook therefore wraps the queue in a Proxy that leaves `push` native until the runtime installs its own. If Slack stops loading after a web client update, check `~/.config/Slack/logs/default/webapp-console.log` for `ReleaseModuleFactoriesPlugin` or `slack-patch` errors, and `sudo ./apply.sh --only 0002,0003,0005` keeps the patches that don't touch the web client.
 
 ## Draw window hook
 
@@ -75,3 +79,14 @@ When a screen share starts, Slack runs `$SLACK_SHARE_ROTATION_HOOK`, or `~/.conf
 - `window-rule.lua` floats, pins and unblurs the overlay. Don't add `no_focus`: it makes the overlay ignore clicks. It also floats and pins the huddle panel (`0005`), and raises it again 50 ms after the overlay takes focus, because Hyprland raises the overlay over it when you click to draw.
 
 Don't enable `allow_token_by_default` in xdph. It doesn't stop the repeat prompts, because Chromium drops the first two sessions before they start, so they never get a token. And it can make the portal reuse your last screen without asking.
+
+## KDE Plasma example
+
+`examples/kde/` is a setup for KDE Plasma 6 (KWin on Wayland) with xdg-desktop-portal-kde. It needs `qdbus6`, `jq` and `pw-dump` (PipeWire).
+
+- `slack-draw-window-hook.sh` is the draw window hook. Link it in: `ln -s …/examples/kde/slack-draw-window-hook.sh ~/.config/slack-patch/draw-window-hook`. Keep `kwin-slack-huddle.js` next to it: the hook loads that file into KWin (as the script `slack-huddle`) with the overlay's target, and unloads it when the overlay closes.
+- `kwin-slack-huddle.js` removes the overlay's border, keeps it above other windows and off the taskbar and switcher, and places it over the shared screen. It also keeps the huddle panel (`0005`) above, and raises it again whenever the overlay takes focus, so the button that turns drawing off stays clickable.
+
+The hook needs no picker wrapper: KWin names each screen-cast PipeWire stream `kwin-screencast-<output>`, so the newest such stream tells the hook which screen you picked. Slack shows the overlay before you pick, so the overlay starts on Slack's bounds (the primary display), and the hook moves it once the stream appears (it waits up to 60 seconds). If another app is casting a screen at the same time (OBS, KRDP), its stream can win instead. The hook logs to `$XDG_RUNTIME_DIR/slack-draw-hook/log`.
+
+There's no KDE share rotation hook (`0006`) yet: it would need checking on a rotated monitor whether KWin's screen cast already sends it upright.

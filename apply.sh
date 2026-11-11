@@ -73,6 +73,10 @@ version=$(cat "$dir/version")
 sha=$(sha256sum "$res/app.asar.orig" | cut -d' ' -f1)
 [[ $sha == "$PINNED_SHA256" ]] || die "app.asar.orig sha256 $sha does not match pinned $PINNED_SHA256"
 
+for tool in node npm; do
+  command -v "$tool" >/dev/null || die "$tool not found on PATH (sudo resets PATH: install it system-wide or run sudo env PATH=\"\$PATH\" $0)"
+done
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 # Not npx: npx mangles brace globs passed to --unpack.

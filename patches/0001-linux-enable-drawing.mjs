@@ -14,17 +14,18 @@ export function hook(addModulePatch) {
         get: (o, k) =>
           k !== 'd'
             ? o[k]
-            : (x, defs) => {
+            : // d(exports, getters, values): newer runtimes take plain values as a third argument.
+              (x, defs, values, ...rest) => {
+                const yes = function isDrawSupported() {
+                  return true
+                }
                 for (const key in defs) {
                   try {
-                    if (defs[key]().name === 'isDrawSupported')
-                      defs[key] = () =>
-                        function isDrawSupported() {
-                          return true
-                        }
+                    if (defs[key]().name === 'isDrawSupported') defs[key] = () => yes
                   } catch {}
                 }
-                return o.d(x, defs)
+                for (const key in values || {}) if (values[key] && values[key].name === 'isDrawSupported') values[key] = yes
+                return o.d(x, defs, values, ...rest)
               },
       })
       return f.call(this, module, exports, r)
